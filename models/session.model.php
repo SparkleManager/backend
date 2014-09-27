@@ -5,7 +5,7 @@
  * Date: 27/09/2014
  * Time: 10:29
  */
-
+ 
 class Session Extends Model {
     private $currSessId;
 

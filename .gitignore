@@ -1,0 +1,21 @@
+### SublimeText ###
+*.tmlanguage.cache
+*.tmPreferences.cache
+*.stTheme.cache
+
+*.sublime-workspace
+*.sublime-project
+sftp-config.json
+
+
+### NotepadPP ###
+# Notepad++ backups #
+*.bak
+
+
+### PhPStorm ###
+.idea/
+
+
+# Configuration
+config/config.inc.php

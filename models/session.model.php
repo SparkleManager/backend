@@ -1,4 +1,4 @@
-<?php 
+<?php
 /**
  * Created by PhpStorm.
  * User: Shujaa
@@ -6,7 +6,7 @@
  * Time: 10:29
  */
 
-class Session Extends Model {
+class Session_ Extends Model {
     private $currSessId;
 
     public function __construct() {

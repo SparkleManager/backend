@@ -3,13 +3,17 @@
 class Main {
 
   private $config;
+  private $loadedModel = array();
 
   public function __construct(){
     // Define constants
     define("ROOT", dirname(__DIR__));
 
     // Load configuration
-    require(ROOT . "config/config.inc.php");
+    require(ROOT . "/config/config.inc.php");
+
+    // Load Model
+    require(ROOT . "/models/model.php")
   }
 
   public function useModel($string){

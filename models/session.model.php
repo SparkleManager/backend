@@ -71,8 +71,7 @@ class Session Extends Model
     {
         // Clean database by removing entries older than a predefined time range in seconds
         $delay = $this->main->getConfig("sessionTTL");
-        // TODO Use dedicated function from the Model class
-        parent::query("DELETE FROM `sessions` WHERE timestamp < (UNIX_TIMESTAMP() - ${delay})");
+        parent::cleanSessions($delay);
     }
 
     /**
@@ -106,25 +105,17 @@ class Session Extends Model
 
         // Get session entry in DB
         if ($this->currSessId == null) throw new Exception("Session ID undefined", 1911);
-        try
+
+        // If session exists in DB, check for authentication
+        if ($dbSession = parent::exists($this->currSessId))
         {
-            // If session exists in DB, check for authentication
-            if ($dbSession = parent::exists($this->currSessId))
-            {
-                // Session is authenticated iff it has a non-nul userId associated
-                $dbSession = parent::get(array('session.id' => $this->currSessId));
-                return (strlen($dbSession['userId']) > 0);
-            }
-            else
-            {
-                return false; // No DB entry
-            }
+            // Session is authenticated iff it has a non-nul userId associated
+            $dbSession = parent::get(array('session.id' => $this->currSessId));
+            return (strlen($dbSession['userId']) > 0);
         }
-        catch(Exception $e)
+        else
         {
-            // TODO Do we actually catch something relevant here ?
-            //throw $e;
-            return false;
+            return false; // No DB entry
         }
     }
 
@@ -140,24 +131,16 @@ class Session Extends Model
     public function setAuth(User $user)
     {
         // Update DB or insert if not exist
-        try
+
+        // Check that the user exists
+        if ($user->existsInDb())
         {
-            // Check that the user exists
-            if ($user->existsInDb())
-            {
-                // Inserts auth status in database, if exists, insert will only update
-                parent::insertOrUpdate(array("id" => $this->currSessId, "userId" => $user->getId()));
-            }
-            else
-            {
-                throw new Exception("User does not exist", 1912);
-            }
+            // Inserts auth status in database, if exists, insert will only update
+            parent::insertOrUpdate(array("id" => $this->currSessId, "userId" => $user->getId()));
         }
-        catch(Exception $e)
+        else
         {
-            if (floor($e->getCode()/10) == 191) throw $e; // Re-Throw an exception from the Session Model
-            throw $e;
-            // TODO Do we catch something here ?
+            throw new Exception("User does not exist", 1912);
         }
     }
 } 

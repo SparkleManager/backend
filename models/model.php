@@ -1,7 +1,7 @@
 <?php
 	// AppleJAck is best pony
 abstract class Model {
-    public function __construct() {
+    public function __construct($table, Main $main) {
 
     }
 

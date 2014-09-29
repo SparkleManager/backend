@@ -8,9 +8,26 @@
 
 class Session Extends Model
 {
+    /**
+     * Current session ID
+     * @var null|string
+     */
     private $currSessId = null;
+    /**
+     * Object of the Main class
+     * @var Main
+     */
     private $main;
 
+    /**
+     * Class constructor
+     *
+     * Automatically fetches the current Session ID and stores the Main object
+     *
+     * @param Main $main
+     * @throws Exception
+     * @return \Session
+     */
     public function __construct(Main $main)
     {
         // Store pointer to main class
@@ -20,14 +37,11 @@ class Session Extends Model
             - first case from the $_GET['sessionId'] if [a-zA-Z0-9]{26}
             - otherwise use php's
         */
-        // TODO Is it OK to rewrite the session ID like that ?
         if (isset($_GET['sessionId']))
         {
             if (preg_match("#^[0-9a-zA-Z]{26}$#", $_GET['sessionId']))
             {
                 $this->currSessId = $_GET['sessionId'];
-                session_id($this->currSessId);
-                session_start();
             }
             else
             {
@@ -41,22 +55,50 @@ class Session Extends Model
         }
 
         // Call the model class with table name "session"
-        parent::__construct("session");
+        parent::__construct("session", $main);
     }
 
+    /**
+     * Cleanup expired sessions in Database
+     *
+     * A session is expired after a CONFIG number of second, which removes it from the DB
+     *
+     * @param void
+     * @return void
+     * @throws Exception
+     */
     private function cleanup()
     {
         // Clean database by removing entries older than a predefined time range in seconds
         $delay = $this->main->getConfig("sessionTTL");
-        parent::query("DELETE FROM sessions WHERE timestamp < (UNIX_TIMESTAMP() - ${delay})");
+        // TODO Use dedicated function from the Model class
+        parent::query("DELETE FROM `sessions` WHERE timestamp < (UNIX_TIMESTAMP() - ${delay})");
     }
 
+    /**
+     * Returns current session ID
+     *
+     * If a session ID is defined, returns it. If not throws exception (which should not happen if class is properly instantiated.
+     *
+     * @param void
+     * @return null|string
+     * @throws Exception
+     */
     public function getId()
     {
         if ($this->currSessId == null) throw new Exception("Session ID undefined", 1911);
         else return $this->currSessId;
     }
 
+    /**
+     * Get current session's authentication status
+     *
+     * Returns TRUE if the current session is authenticated as some user, FALSE if not.
+     *
+     * @param void
+     * @return bool
+     * @throws Exception
+     */
     public function isAuth()
     {
         // Cleanup DB
@@ -86,21 +128,36 @@ class Session Extends Model
         }
     }
 
-    public function setAuth($auth)
+    /**
+     * Set current session's authentication status using a user id
+     *
+     * To authenticate a user, check that the user exists and link its id to the current session
+     *
+     * @param User $user User to authenticate
+     * @return void
+     * @throws Exception
+     */
+    public function setAuth(User $user)
     {
-        // Force $auth to be a boolean
-        $auth = ($auth == true);
-
         // Update DB or insert if not exist
         try
         {
-            // Inserts auth status in database, if exists, insert will only update
-            parent::insertOrUpdate(array("id" => $this->currSessId, "isAuth" => $auth));
+            // Check that the user exists
+            if ($user->existsInDb())
+            {
+                // Inserts auth status in database, if exists, insert will only update
+                parent::insertOrUpdate(array("id" => $this->currSessId, "userId" => $user->getId()));
+            }
+            else
+            {
+                throw new Exception("User does not exist", 1912);
+            }
         }
         catch(Exception $e)
         {
-            // TODO Do we catch something here ?
+            if (floor($e->getCode()/10) == 191) throw $e; // Re-Throw an exception from the Session Model
             throw $e;
+            // TODO Do we catch something here ?
         }
     }
 } 

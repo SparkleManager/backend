@@ -6,15 +6,20 @@
  * Time: 10:29
  */
 
-class Session_ Extends Model {
+class Session Extends Model {
     private $currSessId;
 
     public function __construct() {
-        // Get PHPSESSID
-        session_start();
-        if (isset($_GET['session']) && preg_match("#^[0-9a-zA-Z]{16,}#")) {
-            $this->currSessId = $_GET['session'];
+        /* Get PHPSESSID,
+            - first case from the $_GET['sessionId'] if [a-zA-Z0-9]{26}
+            - otherwise use php's
+        */
+        if (isset($_GET['sessionId']) && preg_match("#^[0-9a-zA-Z]{26}$#", $_GET['sessionId'])) {
+            $this->currSessId = $_GET['sessionId'];
+            session_id($this->currSessId);
+            session_start();
         } else {
+            session_start();
             $this->currSessId = session_id();
         }
 

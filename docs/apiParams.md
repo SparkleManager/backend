@@ -1,5 +1,5 @@
-Listes des paramètres de l'API
+API parameters
 ===============
 
-### session
-Utilisé pour fournir à la main l'identifiant de session sous forme [a-zA-Z0-9]{26}, si invalide, renvoie une erreur.
+### sessionId (opt)
+Can be set to provide the session ID. Must follow regexp: [a-zA-Z0-9]{26} or returns an error. If not set, PHP's session ID will be used. 

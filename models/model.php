@@ -11,9 +11,11 @@ class Table
 	private $table;
 
 	/**
-	* Constructor
-	* #in : name of the table
-	**/
+	 * Constructor
+	 * Look for the PDO or create it. Name the table variable.
+	 *
+	 * @param string $table - Name of the table in the database
+	 */
 	public function __construct($table)
 	{
 		/* Connexion to the database */
@@ -29,10 +31,12 @@ class Table
 	}
 	
 	/**
-	* Insert a line into the database
-	* #in : line to add, array("field1"=>"value1","field2"=>"value2")
-	* #out : true
-	**/
+	 * Insert a line into the database
+	 *
+	 * Transform the $line array into a string and send the SQL query
+	 *
+	 * @param array $line - Line to add to the DataBase - array("field1"=>"value1","field2"=>"value2")
+	 */
 	public function insert(array $line)
 	{
 		/* Associative Array $line > 2 String */
@@ -49,10 +53,16 @@ class Table
 		/* Query */
 		$query = "INSERT INTO `".$this->table."` (".$field.") VALUES (".$value.")";
 		$result = $this->pdo->query($query);
-
-		return true;
 	}
 	
+	/**
+	 * Insert lines into the database
+	 *
+	 * Transform the $line array into a string
+	 * Loops to send one INSERT with 1000 rows max
+	 * 
+	 * @param array $lines - Lines to add to the DataBase - array( [0] => array("field1"=>"value1","field2"=>"value2"), [1] => array("field2"=>"value4"))
+	 */
 	public function insertBatch(array $lines)
 	{
 		/* SQL can't insert more than 1000 rows with one insert */
@@ -95,13 +105,16 @@ class Table
 	}
 
 	/**
-	* Get line(s) from the database
-	* #in 1 : where condition(s), array("field1"=>"value1","field2"=>"value2")
-	*	can be NULL (get all lines)
-	* #in 2 : field(s) to get, array("field1","field2")
-	*	if $where = array(0=>"all") : get all fields
-	* #out : lines selected, array( [0]=> array("field1"=>"value1","field2"=>"value2") , [1]=> array("field1"=>"value3","field2"=>"value4"))
-	**/
+	 * Get line(s) from the database
+	 *
+	 * Select line(s) from the database with WHERE, which FIELDS and INNER JOIN options
+	 *
+	 * @param array $where - WHERE condition(s), return all if ["all"] - array("field1"=>"value1","field2"=>"value2")
+	 * @param array $fields - *optional - Which field(s) to get, return all if NULL - array("field1","field2")
+	 * @param array $join - *optional - Table to JOIN - array("other table","field table 1","field table 2")
+	 *
+	 * @return array - Return Line(s) selected - array( [0]=> array("field1"=>"value1","field2"=>"value2"), [1]=> array("field1"=>"value3","field2"=>"value4"))
+	 */
 	public function get(array $where, array $fields = NULL, array $join = NULL)
 	{
 		/* Array to string, if $fields is null : Return all fields */
@@ -121,19 +134,19 @@ class Table
 		
 		/* Query */
 		$query = "SELECT ".$fields." FROM ".$this->table.$sqlwhere.$sqljoin;
-		echo $query;
 		$result = $this->pdo->query($query);
 		
 		return $result->fetchAll(PDO::FETCH_ASSOC);
 	}
-	
-	/**
-	* Update line(s) from the database
-	* #in 1 : field(s) to replace, array("field1"=>"newvalue1","field2"=>"newvalue2")
-	* #in 2 : where condition(s), array("field1"=>"value1","field2"=>"value2")
-	*	if $where = array(0=>"all") : update all lines
-	* #out : true
-	**/
+
+    /**
+     * Update line(s) from the database
+	 *
+	 * Transform the array to string and send the SQL query
+     * 
+     * @param array $data - Field(s) to replace - array("field1"=>"newvalue1","field2"=>"newvalue2")
+	 * @param array $where - WHERE condition(s), return all if ["all"] - array("field1"=>"value1","field2"=>"value2")
+     */
 	public function update(array $data, array $where)
 	{
 		/* Assemble the data to string format */
@@ -148,16 +161,15 @@ class Table
 		/* Query */
 		$query = "UPDATE ".$this->table." SET ".$setdata.$sqlwhere;
 		$result = $this->pdo->query($query);
-		
-		return true;
 	}
 	
-	/**
-	* Delete line(s) from the database
-	* #in 1 : where condition(s), array("field1"=>"value1","field2"=>"value2")
-	*	if $where = array(0=>"all") : Delete all lines
-	* #out : true
-	**/
+    /**
+     * Delete line(s) from the database
+	 *
+	 * Transform the array to string and send the SQL query
+     * 
+	 * @param array $where - WHERE condition(s), return all if ["all"] - array("field1"=>"value1","field2"=>"value2")
+     */
 	public function delete(array $where)
 	{
 		/* Assemble the Where condition */
@@ -166,10 +178,17 @@ class Table
 		/* Query */
 		$query = "DELETE FROM `".$this->table."`".$sqlwhere;
 		$result = $this->pdo->query($query);
-
-		return true;
 	}
 	
+    /**
+     * Check if a line exist inside the table
+	 *
+	 * Send a SELECT query with the condition(s) given and check if at least one row is returned
+     * 
+     * @param array|int $ids - Id to check, int or  WHERE condition(s) - int OR array("field1"=>"value1","field2"=>"value2")
+     * 
+     * @return bool - True is exist, False if not
+     */
 	public function exists($ids)
 	{
 		/* Assemble the Where condition */
@@ -218,22 +237,52 @@ class Table
 		// return $return;
 	}
 	
-	public function cleanSessions($time)
+    /**
+     * Prepared special request dependent of the table, see descriptions below
+     * 
+     * @param mixed $args
+     * 
+     * @return mixed
+     */
+	public function specialFunction($args)
 	{
-		/* Test argument */
-		if(!is_int($time))
-			throw new InvalidArgumentException("Argument 1 passed to cleanSessions() must be an integer, ".gettype($time)." given");
-		else
+		switch($this->table)
 		{
-			/* Query */
-			$query = "DELETE FROM `".$this->table."` WHERE `timestamp` < (UNIX_TIMESTAMP() - ".$time.")";
-			$result = $this->pdo->query($query);
-			
-			return true;
+            /**
+             * Sessions special function
+			 * 
+			 * Clean the sessions older than $time
+             *
+             * @param int - Time 
+             */
+			case "sessions":
+			{
+				if(!is_int($args))
+					throw new InvalidArgumentException("Argument 1 passed to specialFunction() of ".$this->table." must be an integer, ".gettype($args)." given");
+				else
+				{
+					/* Query */
+					$query = "DELETE FROM `sessions` WHERE `timestamp` < (UNIX_TIMESTAMP() - ".$args.")";
+					$result = $this->pdo->query($query);
+				}
+				break;
+			}
+			default:
+			{
+				/* TODO default exception */
+			}	
 		}
 	}
 	
-	/* Put the Where array to string format */
+    /**
+     * Put the Where array to string format
+     * 
+	 * Construct the string to insert as WHERE inside the SQL query
+	 *
+     * @param array $where 
+     * 
+     * @return string
+     */
 	private function arrayToStringWhere(array $where)
 	{
 		if((count($where) == 0) || (isset($where[0]) && $where[0] == "all"))

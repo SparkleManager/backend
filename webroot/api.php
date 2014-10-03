@@ -13,11 +13,13 @@ class Main {
     require(ROOT . "/config/config.inc.php");
 
     // Load Model
-    require(ROOT . "/models/model.php")
+    require(ROOT . "/models/model.php");
   }
 
   public function useModel($string){
-    
+        require(ROOT."/models/".$string.".model.php");
+        $class = ucfirst($string);
+      return new $class($this);
   }
 
   public function useView(){

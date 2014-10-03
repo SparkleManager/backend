@@ -1,52 +1,39 @@
 <?php
-error_reporting(0);
-function myErrorHandler($errno, $errstr, $errfile, $errline)
-{
-//    if (!(error_reporting() & $errno)) {
-//        // This error code is not included in error_reporting
-//        return;
-//    }
 
-    switch ($errno) {
-        case E_USER_ERROR:
-            echo "<b>My ERROR</b> [$errno] $errstr<br />\n";
-            echo "  Fatal error on line $errline in file $errfile";
-            echo ", PHP " . PHP_VERSION . " (" . PHP_OS . ")<br />\n";
-            echo "Aborting...<br />\n";
-            exit(1);
-            break;
+class Log extends Model {
 
-        case E_USER_WARNING:
-            echo "<b>My WARNING</b> [$errno] $errstr<br />\n";
-            break;
+    /**
+     * Object of the Main class
+     * @var Main
+     */
+    private $main;
 
-        case E_USER_NOTICE:
-            echo "<b>My NOTICE</b> [$errno] $errstr<br />\n";
-            break;
+    /**
+     * Class constructor
+     *
+     * nothing to say
+     *
+     * @param Main $main
+     * @return \Log
+     */
+    public function __construct(Main $main)
+    {
+        // Store pointer to main class
+        $this->main = $main;
 
-        default:
-            echo "Unknown error type: [$errno] $errstr<br />\n";
-            break;
+        // Call the model class with table name "session"
+        parent::__construct("log", $main);
     }
 
-    /* Don't execute PHP internal error handler */
-    return true;
+    /**
+     * Inserts a log entry into the DB
+     *
+     * @param Array $entry
+     * @return void
+     */
+    public function insert($entry)
+    {
+        parent::insert($entry);
+        if (sparkleLogger::LOGGER_DEBUG) echo "Inserting ".sparkleLogger::$levels[$entry['level']]."<br>";
+    }
 }
-
-function fatal_handler() {
-    $error = error_get_last();
-    $errno   = $error["type"];
-    $errfile = $error["file"];
-    $errline = $error["line"];
-    $errstr  = $error["message"];
-
-    myErrorHandler($errno, $errstr, $errfile, $errline);
-}
-
-$old_error_handler = set_error_handler("myErrorHandler");
-register_shutdown_function( "fatal_handler" );
-
-
-trigger_error("Value at position $pos is not a number, using 0 (zero)", E_USER_ERROR);
-
-$a = new A;

@@ -1,3 +1,11 @@
 <?php
-	// AppleJAck is best pony
+	class Model {
+
+        public function __construct($table, Main $main) {
+
+        }
+        public function insert($sth) {
+
+        }
+    }
 ?>

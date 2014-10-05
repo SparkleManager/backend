@@ -1,12 +1,12 @@
 <?php
 
-class Main {
+final class Main {
 
   private $config;
   private $loadedModels = array();
 
-  private $currentController = null;
-  private $currentAction = null;
+  private $controller = null;
+  private $action = null;
 
   /**
    * Constructor of Main
@@ -17,100 +17,99 @@ class Main {
     // Define constants
     $this->defineConstants(array(
       "CONTROLLERS" => ROOT . "/controllers",
-      "MODELS" => ROOT . "/models",
-      "VIEWS" => ROOT . "/views",
-      "WEBROOT" => ROOT . "/views",
-      "INCLUDES" => ROOT . "/includes"
+      "MODELS"      => ROOT . "/models",
+      "VIEWS"       => ROOT . "/views",
+      "WEBROOT"     => ROOT . "/views",
+      "INCLUDES"    => ROOT . "/includes"
     ));
 
-<<<<<<< HEAD
     // Load configuration
     $this->loadConfig();
 
-    // Load Logger
-    require(INCLUDES . "/sparkleLogger.php");
-=======
     // Load Model
-    require(ROOT . "/models/model.php");
+    $this->initModel();
+
+    // Initialisation of sparkleLogger
+    $this->initLogger();
+
+    // Load Model
+    $this->initView();
+
+    // Routing
+    $this->route();
   }
-
-  public function useModel($string){
-        require(ROOT."/models/".$string.".model.php");
-        $class = ucfirst($string);
-      return new $class($this);
-  }
->>>>>>> origin/feature-logger
-
-    // Set Debug Mode
-    Logger::setDebug($this->config["debug"]);
-
-    // Loading Model
-    require(ROOT . "/models/model.php");
-
-    try {
-      $this->route();
-    } catch (Exception $e) {
-      $this->catchExceptionAndDie($e);
-    }
-  }
-
 
   /**
    * Redirect the current user on the correct controller
    */
-  private function route(){ 
+   private function route(){ 
     if(!isset($_GET["controller"]) || !isset($_GET["action"])){
-      throw new Exception("invalid-request");
+      $this->missingParams();
     }
 
     // Check if all characters are alphabetic
-    if(
-      !ctype_alpha($_GET["controller"]) ||
-      !ctype_alpha($_GET["action"])
-    ) {
-      throw new Exception("unauthorized-symbols");
+    if(!ctype_alpha($_GET["controller"]) || !ctype_alpha($_GET["action"])) {
+      $this->unauthoriedSymbols();
     }
 
-    $this->controller = $_GET['controller'];
-    $this->action = $_GET['action'];
+    $controller = $_GET['controller'];
+    $action = $_GET["action"];
+
+    /**
+     * Check if controller exist
+     */
+    if(
+      !file_exists(CONTROLLERS . "/" . $controller . "/" . $controller . ".php")
+    ){
+      $this->controllerNotFound();
+    }
+
+    // Load current controller
+    $this->initController();
+    require(CONTROLLERS . "/" . $controller . "/" . $controller . ".php");
+    
+    $controller = ucfirst($controller) . "Controller";
+    $controllerAttrs = get_class_vars($controller);
+
+    // Check if it's a public controller
+    if(!$controllerAttrs["isAccessible"]){
+      $this->controllerNotFound();
+    }
+
+    // Check if the user needs to be authenticated to access this controller
+    if($controllerAttrs["needsLogin"]){
+      $Session = $this->useModel("session");
+      if(!$Session->isAuth()){
+        $this->notAuthenticated();
+      }
+    }
+
+    // Check if the action exist
+    if(!method_exists($controller, $action)){
+      $this->actionNotFound();
+    }
+
+    // Create the controller
+    $this->controller = new $controller();
+    $this->action = $action;
+
+    $this->controller->$action();
   }
 
 
   /*==========  Public methods  ==========*/
-
     public function useModel($model){
-      
-    }
-
-
-  /*==========  Common methods  ==========*/
-
-    /**
-     * Set HTTP Code
-     * @param [Number] $code HTTP Code
-     */
-    private function setHTTPCode($code){
-      http_response_code($code);
-    }
-
-
-  /*==========  Configuration methods  ==========*/
-
-    /**
-     * Load configuration
-     */
-    private function loadConfig(){
-      require(ROOT . "/config/config.php");
-    }
-
-    /**
-     * Define constants
-     * @param  [Array] $constants List of constants to define
-     */
-    private function defineConstants($constants){
-      foreach ($constants as $name => $value) {
-        define($name, $value);
+      if(isset($this->loadedModels[$model])){
+        return $this->loadedModels[$model];
       }
+
+      require(MODELS . "/" . $model . ".model.php");
+
+      $className = ucfirst($model);
+      $model = new $className($this);
+      $this->loadedModels[$className] = $model;
+
+      return $model;
     }
 
     /**
@@ -135,19 +134,111 @@ class Main {
       return $this->config[$entry];
     }
 
-
-  /*==========  Exception handler methods  ==========*/
-
     /**
-     * Log Exception (This function does not return)
-     * @param Exception $e
+     * Define constants
+     * @param  [Array] $constants List of constants to define
      */
-    private function catchExceptionAndDie(Exception $e){
-      $this->setHTTPCode(500);
-      Logger::error($e->getCode(), $e->getMessage());
-      die();
+    public function defineConstants($constants){
+      foreach ($constants as $name => $value) {
+        define($name, $value);
+      }
     }
 
+  /*==========  Configuration methods  ==========*/
+    /**
+     * Load configuration
+     */
+    private function loadConfig(){
+      require(ROOT . "/config/config.php");
+    }
+
+    /**
+     * Initialisation of sparkleLogger
+     */
+    private function initLogger(){
+      require(INCLUDES . "/sparkleLogger.php");
+
+      $debugLevel = sparkleLogger::LEVEL_CRIT;
+      if(!empty($this->config["debugLevel"])){
+        $debugLevel = $this->config["debugLevel"];
+      }
+
+      sparkleLogger::registerHandlers(
+        $this,
+        $this->config["debug"],
+        $debugLevel
+      );
+    }
+
+    /**
+     * Load abstract class Controller
+     */
+    private function initController(){
+      require(ROOT . "/controllers/controller.php");
+    }
+
+    /**
+     * Load abstract class Model
+     */
+    private function initModel(){
+      require(ROOT . "/models/model.php");
+    }
+
+    /**
+     * Load abstract class View
+     */
+    private function initView(){
+      /**
+        TODO:
+        - Loading abstract class View
+      **/
+    }
+
+  /*==========  Error methods  ==========*/
+    private function missingParams(){
+      http_response_code(400);
+      echo json_encode(array(
+        "status" => false,
+        "message" => "Missing params"
+      ));
+      exit;
+    }
+
+    private function controllerNotFound(){
+      http_response_code(404);
+      echo json_encode(array(
+        "status" => false,
+        "message" => "Controller not found"
+      ));
+      exit;
+    }
+
+    private function actionNotFound(){
+      http_response_code(404);
+      echo json_encode(array(
+        "status" => false,
+        "message" => "Action not found"
+      ));
+      exit;
+    }
+
+    private function unauthoriedSymbols(){
+      http_response_code(400);
+      echo json_encode(array(
+        "status" => false,
+        "message" => "Unauthorized symbols"
+      ));
+      exit;
+    }
+
+    private function notAuthenticated(){
+      http_response_code(401);
+      echo json_encode(array(
+        "status" => false,
+        "message" => "Authentification needed"
+      ));
+      exit;
+    }
 }
 
 $Main = new Main();

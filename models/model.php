@@ -16,18 +16,40 @@ class Table
 	 *
 	 * @param string $table - Name of the table in the database
 	 */
-	public function __construct($table)
+	public function __construct($main,$table)
 	{
-		/* Connexion to the database */
-		$this->host = 'localhost';
-		$this->port = '';
-		$this->bdd = 'bronydays';
-		$this->user = 'root';
-		$this->password = 'AppleJack';
-		$this->pdo = new PDO('mysql:host='.$this->host.';port='.$this->port.';dbname='.$this->bdd, $this->user, $this->password);
-	
-		/* Name of the table */
-		$this->table = $table;
+		if(!ctype_alpha($table))
+			throw new InvalidArgumentException("Argument 2 passed to Table constructor must be a alphabetic string, ".gettype($table)." given");
+		else if(!is_a($main,"Main"))
+			throw new InvalidArgumentException("Argument 1 passed to Table constructor must be a Main object, ".get_class($main)." given");
+		else
+		{
+			/* Connexion to the database */
+			$this->host = 'localhost';
+			$this->port = '';
+			$this->bdd = 'bronydays';
+			$this->user = 'root';
+			$this->password = 'AppleJack';
+			$this->post = 'localhost';
+			
+			// $this->host = $main->getConfig("host");
+			// $this->port = $main->getConfig("port");
+			// $this->bdd = $main->getConfig("bdd");
+			// $this->user = $main->getConfig("user");
+			// $this->password = $main->getConfig("password");
+			try
+			{
+				$this->pdo = new PDO('mysql:host='.$this->host.';port='.$this->port.';dbname='.$this->bdd, $this->user, $this->password);
+			}
+			catch(PDOException $e)
+			{
+				throw new Exception ($e->getMessage(),$e->getCode());
+			}
+		
+			/* Name of the table */
+			$this->table = $table;
+		}
+		
 	}
 	
 	/**
@@ -39,6 +61,19 @@ class Table
 	 */
 	public function insert(array $line)
 	{
+		/* Secure the fields */
+		$this->checkFields(array_keys($line));
+		
+		/* Prepare the value */
+		$i = 0;
+		$stockedvalue = array();
+		foreach($line as $key=>$value)
+		{
+			$stockedvalue[":param".$i] = $value;
+			$line[$key] = ":param".$i;
+			$i++;
+		}
+	
 		/* Associative Array $line > 2 String */
 		$field = [];
 		$value = [];
@@ -47,12 +82,11 @@ class Table
 			$field[] = $onefield;
 			$value[] = $onevalue;
 		}
-		$field = "`".implode("`,`",$field)."`";
-		$value = "'".implode("','",$value)."'";
 
 		/* Query */
-		$query = "INSERT INTO `".$this->table."` (".$field.") VALUES (".$value.")";
-		$result = $this->pdo->query($query);
+		$query = "INSERT INTO `".$this->table."` (`".implode("`,`",$field)."`) VALUES (".implode(",",$value).");";
+		$sth = $this->pdo->prepare($query);
+		$sth->execute($stockedvalue);
 	}
 	
 	/**
@@ -70,15 +104,33 @@ class Table
 			$maxarray = array_chunk($lines,1000);
 		else
 			$maxarray = [$lines];
-			
+		
+		$prepare = array();
 		foreach($maxarray as $lines)
 		{
+			/* Secure the fields lines */
+			foreach($lines as $line)
+				$this->checkFields(array_keys($line));
+			
+			/* Prepare the value */
+			$i = 0;
+			$stockedvalue = array();
+			foreach($lines as &$derp)
+			{
+				foreach($derp as $key=>$value)
+				{
+					$stockedvalue[":param".$i] = $value;
+					$derp[$key] = ":param".$i;
+					$i++;
+				}
+			}
+
 			/* Create the fields SQL string */
 			$fields = array();
 			foreach($lines as $line)
 				$fields = array_merge($fields,$line);
 			$fields = array_keys($fields);
-			$sqlfields = "(".implode(",",$fields).")";
+			$sqlfields = "(`".implode("`,`",$fields)."`)";
 
 			/* Create the values SQL string */
 			$sqlvalues = array();
@@ -92,16 +144,24 @@ class Table
 					else
 						$sqlline[] = "DEFAULT";
 				}
-				$sqlvalues[] = "(".implode(",",$sqlline).")";
+				/* Prepare the value */
+				$sqlvalues[] =  "(".implode(",",$sqlline).")";
 			}
 			$sqlvalues = implode(",",$sqlvalues);
-			
+
 			/* Query */
-			$query = "INSERT INTO `".$this->table."` ".$sqlfields." VALUES ".$sqlvalues;
-			$result = $this->pdo->query($query);
+			$prepare[] = array("sql"=>"INSERT INTO `".$this->table."` ".$sqlfields." VALUES ".$sqlvalues.";","values"=>$stockedvalue);
 		}
 		
-		/* Insert null */
+		
+		/* Execute each prepared query */
+		foreach($prepare as $insert)
+		{
+			$sth = $this->pdo->prepare($insert["sql"]);
+			$sth->execute($insert["values"]);
+		}
+		/* TODO Insert null */
+		/* TODO Delete if exception */
 	}
 
 	/**
@@ -117,6 +177,14 @@ class Table
 	 */
 	public function get(array $where, array $fields = NULL, array $join = NULL)
 	{
+		/* Secure the fields */
+		if($fields != NULL)
+			$this->checkFields($fields);
+			
+		/* Secure the join */
+		if($join != NULL)
+			$this->checkFields($join);
+		
 		/* Array to string, if $fields is null : Return all fields */
 		if(empty($fields))
 			$fields = "*";
@@ -125,6 +193,8 @@ class Table
 
 		/* Assemble the Where condition */
 		$sqlwhere = $this->arrayToStringWhere($where);
+		$stockedvalue = $sqlwhere["values"];
+		$sqlwhere = $sqlwhere["sql"];
 			
 		/* Assemble the Join to string format */
 		if(!empty($join) && (count($join) == 3))			
@@ -134,9 +204,10 @@ class Table
 		
 		/* Query */
 		$query = "SELECT ".$fields." FROM ".$this->table.$sqlwhere.$sqljoin;
-		$result = $this->pdo->query($query);
+		$sth = $this->pdo->prepare($query);
+		$sth->execute($stockedvalue);
 		
-		return $result->fetchAll(PDO::FETCH_ASSOC);
+		return $sth->fetchAll(PDO::FETCH_ASSOC);
 	}
 
     /**
@@ -149,18 +220,34 @@ class Table
      */
 	public function update(array $data, array $where)
 	{
+		/* Check the data fields */
+		$this->checkFields(array_keys($data));
+
+		/* Prepare the value */
+		$i = 0;
+		$stockedvalue = array();
+		foreach($data as $key=>$value)
+		{
+			$stockedvalue[":param".$i] = $value;
+			$data[$key] = ":param".$i;
+			$i++;
+		}
+		
 		/* Assemble the data to string format */
 		$setdata = [];
 		foreach ($data as $onefield => $onevalue)
-			$setdata[] = "`".$onefield."` = '".$onevalue."'";
+			$setdata[] = "`".$onefield."` = ".$onevalue;
 		$setdata = implode(",",$setdata);
 		
 		/* Assemble the Where condition */
 		$sqlwhere = $this->arrayToStringWhere($where);
+		$stockedvalue = array_merge($stockedvalue,$sqlwhere["values"]);
+		$sqlwhere = $sqlwhere["sql"];
 
 		/* Query */
 		$query = "UPDATE ".$this->table." SET ".$setdata.$sqlwhere;
-		$result = $this->pdo->query($query);
+		$sth = $this->pdo->prepare($query);
+		$sth->execute($stockedvalue);
 	}
 	
     /**
@@ -174,10 +261,13 @@ class Table
 	{
 		/* Assemble the Where condition */
 		$sqlwhere = $this->arrayToStringWhere($where);
+		$stockedvalue = $sqlwhere["values"];
+		$sqlwhere = $sqlwhere["sql"];
 
 		/* Query */
 		$query = "DELETE FROM `".$this->table."`".$sqlwhere;
-		$result = $this->pdo->query($query);
+		$sth = $this->pdo->prepare($query);
+		$sth->execute($stockedvalue);
 	}
 	
     /**
@@ -192,49 +282,29 @@ class Table
 	public function exists($ids)
 	{
 		/* Assemble the Where condition */
-		if(is_int($ids))
-			$sqlwhere = " WHERE `id` = ".$ids;
+		if(is_string($ids))
+		{
+			$sqlwhere = " WHERE `id` = :param";
+			$stockedvalue = ["param"=>$ids];
+		}
 		else if (is_array($ids))
+		{
 			$sqlwhere = $this->arrayToStringWhere($ids);
+			$stockedvalue = $sqlwhere["values"];
+			$sqlwhere = $sqlwhere["sql"];
+		}
 		else
-			throw new InvalidArgumentException("Argument 1 passed to exists() must be an integer or an array, ".gettype($ids)." given");
+			throw new InvalidArgumentException("Argument 1 passed to exists() must be an string or an array, ".gettype($ids)." given");
 
 		/* Query */
 		$query = "SELECT `id` FROM `".$this->table."`".$sqlwhere." LIMIT 1";
-		$result = $this->pdo->query($query);
+		$sth = $this->pdo->prepare($query);
+		$sth->execute($stockedvalue);
 		
-		if($result->fetchColumn() > 0)
+		if($sth->fetchColumn() > 0)
 			return true;
 		else
 			return false;
-	
-		// /* Close code for existsBatch() */
-		// /* Array to format String */
-		// $sqlwhere = " WHERE `id` = ".implode("OR `id` = ",$ids);
-	
-		// /* Query */
-		// $query = "SELECT `id` FROM `".$this->table."`".$sqlwhere;
-		// $result = $this->pdo->query($query);
-		// $result = $result->fetchAll(PDO::FETCH_ASSOC);
-		
-		// /* Create a comparable array */
-		// $resultids = array();
-		// foreach($result as $value)
-			// $resultids[] = $value["id"];
-		
-		// /* Create the array returned */
-		// $return = array();
-		// foreach($ids as $value)
-			// $return[$value] = true;
-		
-		// /* Search each id */
-		// $result = array_diff($ids,$resultids);
-		
-		// /* If result is not null */
-		// foreach($result as $value)
-			// $return[$value] = false;
-
-		// return $return;
 	}
 	
     /**
@@ -244,33 +314,35 @@ class Table
      * 
      * @return mixed
      */
-	public function specialFunction($args)
+	public function specialFunction($id, array $args = NULL)
 	{
-		switch($this->table)
+		if(!is_int($id))
+			throw new InvalidArgumentException("Argument 1 passed to specialFunction() of ".$this->table." must be an integer, ".gettype($id)." given");
+		if(!is_array($args))
+			throw new InvalidArgumentException("Argument 2 passed to specialFunction() of ".$this->table." must be an array, ".gettype($id)." given");
+
+		switch($id)
 		{
-            /**
-             * Sessions special function
+			/**
+			 * id=1 - Sessions special function
 			 * 
 			 * Clean the sessions older than $time
-             *
-             * @param int - Time 
-             */
-			case "sessions":
+			 *
+			 * @param int - Time 
+			 */
+			case 1:
 			{
-				if(!is_int($args))
-					throw new InvalidArgumentException("Argument 1 passed to specialFunction() of ".$this->table." must be an integer, ".gettype($args)." given");
-				else
-				{
-					/* Query */
-					$query = "DELETE FROM `sessions` WHERE `timestamp` < (UNIX_TIMESTAMP() - ".$args.")";
-					$result = $this->pdo->query($query);
-				}
+				if(!array_key_exists("time",$args) || !is_int($args["time"]))
+					throw new UnexpectedValueException("Argument 2 passed to specialFunction() of ".$this->table." must be array('time'=>integer)");
+
+				/* Query */
+				$query = "DELETE FROM `sessions` WHERE `timestamp` < FROM_UNIXTIME(UNIX_TIMESTAMP() - :param);";
+				$sth = $this->pdo->prepare($query);
+				$sth->execute(["param"=>$args["time"]]);
 				break;
 			}
 			default:
-			{
-				/* TODO default exception */
-			}	
+				throw new UnexpectedValueException("Argument 1 passed to specialFunction() don't find any match");
 		}
 	}
 	
@@ -280,22 +352,55 @@ class Table
 	 * Construct the string to insert as WHERE inside the SQL query
 	 *
      * @param array $where 
+     * @param string $param - Secure Variable
      * 
-     * @return string
+     * @return array - "sql"=>WHERE query, "values"=>Security values
      */
-	private function arrayToStringWhere(array $where)
+	private function arrayToStringWhere(array $where,$param = "whereparam")
 	{
 		if((count($where) == 0) || (isset($where[0]) && $where[0] == "all"))
-			return "";
+			return(["sql"=>"","values"=>array()]);
 		else
 		{
+			if(!ctype_alpha($param))
+				throw new InvalidArgumentException("Argument 2 passed to arrayToStringWhere() must be an alphabetic string, ".gettype($param)." given");
+			
+			/* Check the fields */
+			$this->checkFields(array_keys($where));
+
+			/* Prepare the value */
+			$i = 0;
+			$stockedvalue = array();
+			foreach($where as $key=>$value)
+			{
+				$stockedvalue[":".$param.$i] = $value;
+				$where[$key] = ":".$param.$i;
+				$i++;
+			}			
+
 			$sqlwhere = [];
 			foreach ($where as $onefield => $onevalue)
-				$sqlwhere[] = "`".$onefield."` = '".$onevalue."'";
-			return " WHERE ".implode(" AND ",$sqlwhere);
+			{
+				$sqlwhere[] = "`".$onefield."` = ".$onevalue;
+			}
+			return(["sql"=>" WHERE ".implode(" AND ",$sqlwhere),"values"=>$stockedvalue]);
 		}
 	}
 	
-	
+    /**
+     * Security fonction
+	 *
+	 * Throw an Exception if a field is non alphabetic
+     * 
+     * @param array $fields - Fields to check
+     */
+	private function checkFields(array $fields)
+	{
+		foreach($fields as $value)
+		{
+			if(!ctype_alpha($value))
+				throw new UnexpectedValueException("Field with illegal character detected (non alphabetic)");			
+		}
+	}
 }
 ?>

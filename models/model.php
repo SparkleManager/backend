@@ -1,19 +1,20 @@
 <?php
 class Table
 {
-	protected $host;
-	protected $port;
-	protected $bdd;
-	protected $user;
-	protected $password;
-	protected $pdo;
-	
+	/*
+	 * Name of the table inside the database
+	 * @var string
+	 */
 	private $table;
 
+	/* TODO static & remove */
+	private $pdo;
+	
 	/**
 	 * Constructor
 	 * Look for the PDO or create it. Name the table variable.
 	 *
+	 * @param Main $main - Main object
 	 * @param string $table - Name of the table in the database
 	 */
 	public function __construct($main,$table)
@@ -25,31 +26,31 @@ class Table
 		else
 		{
 			/* Connexion to the database */
-			$this->host = 'localhost';
-			$this->port = '';
-			$this->bdd = 'bronydays';
-			$this->user = 'root';
-			$this->password = 'AppleJack';
-			$this->post = 'localhost';
+			$host = 'localhost';
+			$port = '';
+			$bdd = 'bronydays';
+			$user = 'root';
+			$password = 'AppleJack';
+			$charset = 'utf8';
 			
-			// $this->host = $main->getConfig("host");
-			// $this->port = $main->getConfig("port");
-			// $this->bdd = $main->getConfig("bdd");
-			// $this->user = $main->getConfig("user");
-			// $this->password = $main->getConfig("password");
-			try
-			{
-				$this->pdo = new PDO('mysql:host='.$this->host.';port='.$this->port.';dbname='.$this->bdd, $this->user, $this->password);
-			}
-			catch(PDOException $e)
-			{
-				throw new Exception ($e->getMessage(),$e->getCode());
-			}
+			// /* TODO */
+			// $host = $main->getConfig("host");
+			// $port = $main->getConfig("port");
+			// $bdd = $main->getConfig("bdd");
+			// $user = $main->getConfig("user");
+			// $password = $main->getConfig("password");
+			// $charset = $main->getConfig("charset");
+
+			$this->pdo = new PDO('mysql:host='.$host.';port='.$port.';dbname='.$bdd.';charset='.$charset, $user, $password);
+			/* Return exception as error */
+			$this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+			/* TODO Force name field to lowercase */
+			$this->pdo->setAttribute(PDO::ATTR_CASE, PDO::CASE_LOWER);
+
 		
 			/* Name of the table */
 			$this->table = $table;
 		}
-		
 	}
 	
 	/**
@@ -64,6 +65,12 @@ class Table
 		/* Secure the fields */
 		$this->checkFields(array_keys($line));
 		
+		/* Add id if not included */
+		if(!array_key_exists("id",$line))
+			$line["id"] = uniqid("",true);
+		else
+			$this->checkId($line["id"]);
+
 		/* Prepare the value */
 		$i = 0;
 		$stockedvalue = array();
@@ -112,15 +119,24 @@ class Table
 			foreach($lines as $line)
 				$this->checkFields(array_keys($line));
 			
+			/* Add id if not included */
+			foreach($lines as &$derp1)
+			{
+				if(!array_key_exists("id",$derp1))
+					$derp1["id"] = uniqid("",true);
+				else
+					$this->checkId($derp1["id"]);
+			}
+			
 			/* Prepare the value */
 			$i = 0;
 			$stockedvalue = array();
-			foreach($lines as &$derp)
+			foreach($lines as &$derp2)
 			{
-				foreach($derp as $key=>$value)
+				foreach($derp2 as $key=>$value)
 				{
 					$stockedvalue[":param".$i] = $value;
-					$derp[$key] = ":param".$i;
+					$derp2[$key] = ":param".$i;
 					$i++;
 				}
 			}
@@ -160,7 +176,7 @@ class Table
 			$sth = $this->pdo->prepare($insert["sql"]);
 			$sth->execute($insert["values"]);
 		}
-		/* TODO Insert null */
+		/* TODO Insert ARRAY() */
 		/* TODO Delete if exception */
 	}
 
@@ -294,7 +310,7 @@ class Table
 			$sqlwhere = $sqlwhere["sql"];
 		}
 		else
-			throw new InvalidArgumentException("Argument 1 passed to exists() must be an string or an array, ".gettype($ids)." given");
+			SparkleLogger::error(2000, "Argument 1 passed to exists() must be an string or an array", "",buildContext(get_defined_vars()));
 
 		/* Query */
 		$query = "SELECT `id` FROM `".$this->table."`".$sqlwhere." LIMIT 1";
@@ -317,9 +333,9 @@ class Table
 	public function specialFunction($id, array $args = NULL)
 	{
 		if(!is_int($id))
-			throw new InvalidArgumentException("Argument 1 passed to specialFunction() of ".$this->table." must be an integer, ".gettype($id)." given");
+			SparkleLogger::error(2000, "Argument 1 passed to specialFunction() of ".$this->table." must be an integer", "",buildContext(get_defined_vars()));
 		if(!is_array($args))
-			throw new InvalidArgumentException("Argument 2 passed to specialFunction() of ".$this->table." must be an array, ".gettype($id)." given");
+			SparkleLogger::error(2000, "Argument 2 passed to specialFunction() of ".$this->table." must be an array", "",buildContext(get_defined_vars()));
 
 		switch($id)
 		{
@@ -332,8 +348,10 @@ class Table
 			 */
 			case 1:
 			{
+				if($this->table != "sessions")
+					SparkleLogger::error(2020, "Can't clean sessions with the table ".$this->table, "",buildContext(get_defined_vars()));
 				if(!array_key_exists("time",$args) || !is_int($args["time"]))
-					throw new UnexpectedValueException("Argument 2 passed to specialFunction() of ".$this->table." must be array('time'=>integer)");
+					SparkleLogger::error(2010, "Argument 2 passed to specialFunction() of ".$this->table." must be array('time'=>integer)", "",buildContext(get_defined_vars()));
 
 				/* Query */
 				$query = "DELETE FROM `sessions` WHERE `timestamp` < FROM_UNIXTIME(UNIX_TIMESTAMP() - :param);";
@@ -342,7 +360,7 @@ class Table
 				break;
 			}
 			default:
-				throw new UnexpectedValueException("Argument 1 passed to specialFunction() don't find any match");
+				SparkleLogger::error(2010, "No specialFunction with id ".$id, "",buildContext(get_defined_vars()));
 		}
 	}
 	
@@ -363,7 +381,7 @@ class Table
 		else
 		{
 			if(!ctype_alpha($param))
-				throw new InvalidArgumentException("Argument 2 passed to arrayToStringWhere() must be an alphabetic string, ".gettype($param)." given");
+				SparkleLogger::error(2100, "Argument 2 passed to arrayToStringWhere() must be an alphabetic string", "",buildContext(get_defined_vars()));
 			
 			/* Check the fields */
 			$this->checkFields(array_keys($where));
@@ -399,8 +417,15 @@ class Table
 		foreach($fields as $value)
 		{
 			if(!ctype_alpha($value))
-				throw new UnexpectedValueException("Field with illegal character detected (non alphabetic)");			
+				SparkleLogger::error(2010, "Field with illegal character detected (non alphabetic)", "",buildContext(get_defined_vars()));
 		}
+	}
+	
+	/* TODO */
+	private function checkId($id)
+	{
+		if(false)
+			SparkleLogger::error(2010, "Bad id format", "",buildContext(get_defined_vars()));
 	}
 }
 ?>

@@ -1,4 +1,37 @@
 <?php
+/* Singleton to avoid multiple instance of PDO */
+class PdoHolder
+{
+	/* Holder of the pdo object */
+	protected static $pdo;
+
+	private function __construct(Main $main)
+	{
+		/* Connexion to the database */
+		$host = $main->getConfig("host");
+		$port = $main->getConfig("port");
+		$bdd = $main->getConfig("bdd");
+		$user = $main->getConfig("user");
+		$password = $main->getConfig("password");
+		$charset = $main->getConfig("charset");
+
+		self::$pdo = new PDO('mysql:host='.$host.';port='.$port.';dbname='.$bdd.';charset='.$charset, $user, $password);
+		/* Return exception as error */
+		self::$pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+		/* Force name field to lowercase */
+		self::$pdo->setAttribute(PDO::ATTR_CASE, PDO::CASE_LOWER);	
+	}
+
+	public static function getPDO(Main $main)
+	{
+		if (empty(self::$pdo))
+			new PdoHolder($main);
+
+		return self::$pdo;
+	}
+}
+
+/* TODO public -> protected */
 class Table
 {
 	/*
@@ -7,7 +40,10 @@ class Table
 	 */
 	private $table;
 
-	/* TODO static & remove */
+	/*
+	 * Holder of the PDO object
+	 * @var PDO
+	 */
 	private $pdo;
 	
 	/**
@@ -17,7 +53,7 @@ class Table
 	 * @param Main $main - Main object
 	 * @param string $table - Name of the table in the database
 	 */
-	public function __construct($main,$table)
+	public function __construct(Main $main,$table)
 	{
 		if(!ctype_alpha($table))
 			throw new InvalidArgumentException("Argument 2 passed to Table constructor must be a alphabetic string, ".gettype($table)." given");
@@ -25,28 +61,8 @@ class Table
 			throw new InvalidArgumentException("Argument 1 passed to Table constructor must be a Main object, ".get_class($main)." given");
 		else
 		{
-			/* Connexion to the database */
-			$host = 'localhost';
-			$port = '';
-			$bdd = 'bronydays';
-			$user = 'root';
-			$password = 'AppleJack';
-			$charset = 'utf8';
-			
-			// /* TODO */
-			// $host = $main->getConfig("host");
-			// $port = $main->getConfig("port");
-			// $bdd = $main->getConfig("bdd");
-			// $user = $main->getConfig("user");
-			// $password = $main->getConfig("password");
-			// $charset = $main->getConfig("charset");
-
-			$this->pdo = new PDO('mysql:host='.$host.';port='.$port.';dbname='.$bdd.';charset='.$charset, $user, $password);
-			/* Return exception as error */
-			$this->pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-			/* TODO Force name field to lowercase */
-			$this->pdo->setAttribute(PDO::ATTR_CASE, PDO::CASE_LOWER);
-
+			/* Get the PDO object */
+			$this->pdo = PDOHolder::getPDO($main);
 		
 			/* Name of the table */
 			$this->table = $table;

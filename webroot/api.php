@@ -13,7 +13,7 @@ class Main {
     require(ROOT . "/config/config.inc.php");
 
     // Load Model
-    require(ROOT . "/models/model.php")
+    require(ROOT . "/models/model.php");
   }
 
   public function useModel($string){

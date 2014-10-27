@@ -11,8 +11,8 @@ $this->config = array(
   // MySQL
   "mysqlHost" => "localhost",
   "mysqlPort" => 3306,
-  "mysqlUser" => "sudo",
-  "mysqlPass" => "male_me_a_sandwich",
-  "mysqlDb" => "commit_strip_<3",
+  "mysqlUser" => "sparklemanager",
+  "mysqlPass" => "shining",
+  "mysqlDb" => "sparklemanager",
   "mysqlCharset" => "utf8"
 );

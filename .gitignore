@@ -16,6 +16,3 @@ sftp-config.json
 ### PhPStorm ###
 .idea/
 
-
-# Configuration
-config/config.php

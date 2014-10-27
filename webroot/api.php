@@ -98,6 +98,11 @@ final class Main {
 
 
   /*==========  Public methods  ==========*/
+    /**
+     * Return an instance of a model
+     * @param  [String] $model Model name
+     * @return [Model]
+     */
     public function useModel($model){
       if(isset($this->loadedModels[$model])){
         return $this->loadedModels[$model];
@@ -110,6 +115,18 @@ final class Main {
       $this->loadedModels[$className] = $model;
 
       return $model;
+    }
+
+    /**
+     * Return an instance of a view
+     * @param  [String] $view View name
+     * @return [View]
+     */
+    public function useView($view){
+      require(VIEWS . "/" . $view . ".view.php");
+
+      $className = ucfirst($view);
+      return new $className($this);
     }
 
     /**
@@ -159,9 +176,8 @@ final class Main {
       require(INCLUDES . "/sparkleLogger.php");
 
       $debugLevel = sparkleLogger::LEVEL_CRIT;
-      if(!empty($this->config["debugLevel"])){
+      if(!empty($this->config["debugLevel"]))
         $debugLevel = $this->config["debugLevel"];
-      }
 
       sparkleLogger::registerHandlers(
         $this,
@@ -189,8 +205,8 @@ final class Main {
      */
     private function initView(){
       /**
-        TODO:
-        - Loading abstract class View
+       * TODO:
+       * - Loading abstract class View
       **/
     }
 

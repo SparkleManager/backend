@@ -7,6 +7,6 @@
  */
 
 abstract class Controller {
-    public static $isAccessible = true;
-    public static $needsLogin = true;
+  public static $isAccessible = true;
+  public static $needsLogin = true;
 } 

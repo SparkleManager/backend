@@ -44,12 +44,12 @@ final class Main {
    */
    private function route(){ 
     if(!isset($_GET["controller"]) || !isset($_GET["action"])){
-      $this->missingParams();
+      $this->actionNotFound();
     }
 
     // Check if all characters are alphabetic
     if(!ctype_alpha($_GET["controller"]) || !ctype_alpha($_GET["action"])) {
-      $this->unauthoriedSymbols();
+      $this->actionNotFound();
     }
 
     $controller = $_GET['controller'];
@@ -78,8 +78,8 @@ final class Main {
 
     // Check if the user needs to be authenticated to access this controller
     if($controllerAttrs["needsLogin"]){
-      $Session = $this->useModel("session");
-      if(!$Session->isAuth()){
+      $session = $this->useModel("session");
+      if(!$session->isAuth()){
         $this->notAuthenticated();
       }
     }
@@ -211,15 +211,6 @@ final class Main {
     }
 
   /*==========  Error methods  ==========*/
-    private function missingParams(){
-      http_response_code(400);
-      echo json_encode(array(
-        "status" => false,
-        "message" => "Missing params"
-      ));
-      exit;
-    }
-
     private function controllerNotFound(){
       http_response_code(404);
       echo json_encode(array(
@@ -234,15 +225,6 @@ final class Main {
       echo json_encode(array(
         "status" => false,
         "message" => "Action not found"
-      ));
-      exit;
-    }
-
-    private function unauthoriedSymbols(){
-      http_response_code(400);
-      echo json_encode(array(
-        "status" => false,
-        "message" => "Unauthorized symbols"
       ));
       exit;
     }

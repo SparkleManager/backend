@@ -19,7 +19,7 @@ final class Main {
       "CONTROLLERS" => ROOT . "/controllers",
       "MODELS"      => ROOT . "/models",
       "VIEWS"       => ROOT . "/views",
-      "WEBROOT"     => ROOT . "/views",
+      "WEBROOT"     => ROOT . "/webroot",
       "INCLUDES"    => ROOT . "/includes"
     ));
 
@@ -42,13 +42,13 @@ final class Main {
   /**
    * Redirect the current user on the correct controller
    */
-   private function route(){ 
-    if(!isset($_GET["controller"]) || !isset($_GET["action"])){
-      $this->actionNotFound();
+   private function route(){
+    if(empty($_GET["controller"]) || !ctype_alpha($_GET["controller"])) {
+      $this->controllerNotFound();
     }
 
     // Check if all characters are alphabetic
-    if(!ctype_alpha($_GET["controller"]) || !ctype_alpha($_GET["action"])) {
+    if(empty($_GET["action"]) || !ctype_alpha($_GET["action"])) {
       $this->actionNotFound();
     }
 
@@ -125,7 +125,7 @@ final class Main {
     public function useView($view){
       require(VIEWS . "/" . $view . ".view.php");
 
-      $className = ucfirst($view);
+      $className = ucfirst($view . "View");
       return new $className($this);
     }
 
@@ -190,24 +190,21 @@ final class Main {
      * Load abstract class Controller
      */
     private function initController(){
-      require(ROOT . "/controllers/controller.php");
+      require(CONTROLLERS . "/controller.php");
     }
 
     /**
      * Load abstract class Model
      */
     private function initModel(){
-      require(ROOT . "/models/model.php");
+      require(MODELS . "/model.php");
     }
 
     /**
      * Load abstract class View
      */
     private function initView(){
-      /**
-       * TODO:
-       * - Loading abstract class View
-      **/
+      require(VIEWS . '/view.php');
     }
 
   /*==========  Error methods  ==========*/
